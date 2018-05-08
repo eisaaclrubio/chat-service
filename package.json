@@ -1,0 +1,21 @@
+{
+  "name": "functions",
+  "version": "1.0.0",
+  "description": "firebase backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "run": "node index.js"
+  },
+  "keywords": [
+    "firebase",
+    "request-promise"
+  ],
+  "author": "Isaac",
+  "license": "ISC",
+  "dependencies": {
+    "firebase": "^4.13.1",
+    "request": "^2.85.0",
+    "request-promise": "^4.2.2"
+  }
+}
