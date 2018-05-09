@@ -1,53 +1,73 @@
 const firebase = require('firebase');
-const config = require('./config.js');
-const request = require('request-promise');
+const config = require('./config');
+const ob = require('./src/helper');
 
 firebase.initializeApp(config);
 
 let db = firebase.database();
 let ref = db.ref('messages/');
-let original = {dummy: ''};
+let initialized = false;
+let before = {};
 let messages = [];
-let updated = {};
-let newMessages = [];
+let users = [];
 
-function getLastMessage(user){
-    let masterKey;
-    updated[user].forEach( key => {
-        if(!(key in original)){
-            masterKey = key;
-        }
+ref.once('value').then( (snapshot) => {
+    let snap = snapshot.toJSON();
+    users = ob.getKeys(snap);
+    users.forEach( user => {
+        messages = ob.getKeys(snap[user]);
+        before[user] = messages;
     });
-    let mess = ref.child(user + '/' + masterKey);
-    mess.once('value').then( (snapshot) => {
-        let something = snapshot.toJSON();
-        sendMessage(something['message']);
-    });
-}
+    initialized = true;
+}).catch( error => {
+    console.log('The database is empty');
+});
 
 ref.on( 'value', function(snapshot){
-    if(original === {dummy: ''}){
-        original = snapshot.toJSON();
-        let user = Object.keys(original);
-        messages = Object.keys(original[user]);
-        original[user] = messages;
-    } else {
-        updated = snapshot.toJSON();
-        let user = Object.keys(updated);
-        newMessages = Object.keys(updated[user]);
-        updated[user] = newMessages;
-        getLastMessage(user);
+    if(initialized){
+        let after = snapshot.toJSON();
+        let newUsers = ob.getKeys( after);
+        getAsyncRef(after, newUsers).then( reference => {
+            sendMessage(reference);
+            users = newUsers;
+        });
     }
 });
 
-function sendMessage(message) {
-    return request({
-        url: process.env.SLACKAPI,
-        method: "POST",
-        json: {"text": message}
-    }).then(response => {
-        console.log ("sendToSlack: successfully" );
-    }).catch(error => {
-        console.log ("sendToSlack: " + error);
+function sendMessage(child){
+    child.once('value').then( (snapshot) => {
+        let snap = snapshot.toJSON();
+        ob.sendMessage(snap['message']);
     });
+};
+
+function notAsyncRef(after, newUsers){
+    newUsers.forEach( user => {
+        if(!users.includes(user)){
+            messages = ob.getKeys(after[user]);
+            let message = messages[messages.length - 1];
+            before[user] = messages;
+            messageRef = ref.child(user + '/' + message);
+        } else {
+            let userMessages = ob.getKeys(after[user]);
+            userMessages.forEach(message => {
+                if(!before[user].includes(message)) {
+                    messageRef = ref.child(user + '/' + message);
+                }
+            });
+            before[user] = userMessages;
+        }
+    });
+    return messageRef;
 }
+
+function getAsyncRef(after, newUsers){
+    return new Promise((resolve, reject) => {
+        let messageRef = notAsyncRef(after, newUsers);
+        if(messageRef){
+            resolve(messageRef);
+        } else {
+            reject('Error');
+        }
+    });
+};
