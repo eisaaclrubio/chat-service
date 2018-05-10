@@ -4,6 +4,10 @@ const token = process.env.SLACKTOKEN;
 const web = new WebClient(token);
 
 var chat = {
+    getChannels: function(){
+        return web.channels.list();
+    },
+
     createChanel: function(channel){
         return web.channels.create({name: channel, validate:true});
     },
